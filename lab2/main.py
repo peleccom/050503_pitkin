@@ -18,10 +18,21 @@ def run_echo_server(port):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind(('', port))
         s.listen(1)
-        (conn, addr_info) = s.accept()
+        try:
+            (conn, addr_info) = s.accept()
+        except KeyboardInterrupt, e:
+            print("Accept interrupted by user")
+            s.close()
+            return
         print("Client %s:%s - connected" % addr_info)
         while(True):
-            buff = conn.recv(BUFFER_LENGTH)
+            try:
+                buff = conn.recv(BUFFER_LENGTH)
+            except KeyboardInterrupt, e:
+                print("Receive interrupted by user")
+                conn.close()
+                s.close()
+                return
             if buff:
                 conn.send(buff)
                 print(buff, end='')
