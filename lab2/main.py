@@ -2,8 +2,14 @@
 # -*- coding: UTF-8 -*-
 from __future__ import print_function
 import sys
+import os
 import socket
 
+# A liitle hack to load lever from top-level
+if __name__ == '__main__':
+    sys.path.insert(0,
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from spolkslib import server
 
 BUFFER_LENGTH = 1024
 
@@ -13,11 +19,7 @@ def run_echo_server(port):
        raise ValueError if port not in range 0-65535
     '''
     try:
-        if not 0 <= port <= 65535:
-            raise ValueError("port must be 0-65535")
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(('', port))
-        s.listen(1)
+        s = server.create__local_server(port)
         try:
             (conn, addr_info) = s.accept()
         except KeyboardInterrupt, e:
