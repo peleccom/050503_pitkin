@@ -19,11 +19,11 @@ def transfer_file(sock, f, buf_size=BUFFER_SIZE):
     total_bytes_sended = 0
     while True:
         buffer = f.read(buf_size)
-        need_send = len(buff)
+        need_send = len(buffer)
         if not need_send:
             break
         bytes_sended = sock.send(buffer)
-        total_bytes_sended += bytes_send
+        total_bytes_sended += bytes_sended
         while (bytes_sended < need_send):
             buffer = buffer[bytes_send:]
             need_send = len(buffer)
