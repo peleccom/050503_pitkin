@@ -3,7 +3,7 @@ from __future__ import print_function
 import socket
 
 
-def create__local_server(port, use_UDP=False, backlog=1):
+def create_local_server(port, use_UDP=False, backlog=1):
     '''Create TCP(UDP) server at specified port
     Raise ValueError at wrong port value
     Can raise socket error'''

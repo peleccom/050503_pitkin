@@ -5,7 +5,7 @@ import sys
 import os
 import socket
 
-# A liitle hack to load lever from top-level
+# A liitle hack to load lib from top-level
 if __name__ == '__main__':
     sys.path.insert(0,
         os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -19,7 +19,7 @@ def run_echo_server(port):
        raise ValueError if port not in range 0-65535
     '''
     try:
-        s = server.create__local_server(port)
+        s = server.create_local_server(port)
         try:
             (conn, addr_info) = s.accept()
         except KeyboardInterrupt, e:
