@@ -15,6 +15,29 @@ from spolkslib import fileutils
 
 BUFFER_LENGTH = 1024
 
+def handle_server_request(conn, addr, f):
+    '''Handle single request
+    conn - socket connection
+    addr - addr info
+    f - file object to serve'''
+    print("Client %s:%s - connected" % addr)
+
+    #send file size first
+    file_size = fileutils.get_file_size(f)
+    packed_size = struct.pack("!Q", file_size)
+    sended = conn.send(packed_size)
+    while (sended < len(packed_size)):
+        packed_size = packed_size[bytes_send:]
+        sended = sock.send(packed_size)
+
+    #send file content
+    transfered = fileutils.transfer_file(conn, f)
+    print("bytes " + str(transfered))
+    if transfered != fileutils.get_file_size(f):
+        print("eerror")
+    f.seek(0)
+    conn.close()
+
 
 def serve_file(port, f):
     '''Run server on port to serve file f
@@ -28,23 +51,8 @@ def serve_file(port, f):
                 print("Accept interrupted by user")
                 server_socket.close()
                 return
-            print("Client %s:%s - connected" % addr_info)
+            handle_server_request(conn, addr_info, f)
 
-            #send file size first
-            file_size = fileutils.get_file_size(f)
-            packed_size = struct.pack("!Q", file_size)
-            sended = conn.send(packed_size)
-            while (sended < len(packed_size)):
-                packed_size = packed_size[bytes_send:]
-                sended = sock.send(packed_size)
-
-            #send file content
-            transfered = fileutils.transfer_file(conn, f)
-            print("bytes " + str(transfered))
-            if transfered != fileutils.get_file_size(f):
-                print("eerror")
-            f.seek(0)
-            conn.close()
     except socket.error, e:
         print("Socket error: %s" % (e))
 
