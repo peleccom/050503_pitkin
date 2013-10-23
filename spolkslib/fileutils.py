@@ -3,6 +3,8 @@ from __future__ import print_function
 import socket
 import os
 
+import connutils
+
 BUFFER_SIZE = 1024
 
 
@@ -22,26 +24,27 @@ def transfer_file(sock, f, buf_size=BUFFER_SIZE):
         need_send = len(buffer)
         if not need_send:
             break
-        bytes_sended = sock.send(buffer)
-        total_bytes_sended += bytes_sended
-        while (bytes_sended < need_send):
-            buffer = buffer[bytes_send:]
-            need_send = len(buffer)
-            bytes_sended = sock.send(buffer)
-            total_bytes_sended += bytes_sended
+        if not connutils.send_buffer(sock, buffer):
+            break
+        total_bytes_sended += need_send
     return total_bytes_sended
 
 
-def recv_file(sock, f, filesize,  buf_size=BUFFER_SIZE):
-    '''Receive file from socket'''
+def recv_file(sock, f, download_limit,  buf_size=BUFFER_SIZE):
+    '''Receive file from socket
+    Return count of bytes received'''
     total_bytes_readed = 0
     while (True):
-        if total_bytes_readed == filesize:
-            break
-        buffer = sock.recv(buf_size)
+        need_download = (download_limit - total_bytes_readed)
+        if need_download > buf_size:
+            buffer = connutils.recv_buffer(sock, buf_size)
+        else:
+            buffer = connutils.recv_buffer(sock, need_download)
         bytes_readed = len(buffer)
-        total_bytes_readed += bytes_readed
-        if not bytes_readed:
+        if buffer:
+            f.write(buffer)
+            total_bytes_readed += bytes_readed
+        if ((total_bytes_readed == download_limit) or
+            (bytes_readed < BUFFER_SIZE)):
             break
-        f.write(buffer)
     return total_bytes_readed
