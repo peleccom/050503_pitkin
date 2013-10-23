@@ -20,36 +20,36 @@ def run_echo_server(port):
     '''
     try:
         s = server.create_local_server(port)
-        try:
-            (conn, addr_info) = s.accept()
-        except KeyboardInterrupt, e:
-            print("Accept interrupted by user")
-            s.close()
-            return
-        print("Client %s:%s - connected" % addr_info)
+    except:
+        print("Can't create server")
+        sys.exit(1)
+    try:
         while(True):
+            (conn, addr_info) = s.accept()
+            print("Client %s:%s - connected" % addr_info)
             try:
-                buff = conn.recv(BUFFER_LENGTH)
-            except KeyboardInterrupt, e:
-                print("Receive interrupted by user")
+                while(True):
+                    buff = conn.recv(BUFFER_LENGTH)
+                    if buff:
+                        conn.send(buff)
+                        print(buff, end='')
+                    else:
+                        break
+                    if buff.rstrip() == "!quit":
+                        print("\nShutdown command recognized")
+                        conn.send("Shutdown")
+                        conn.shutdown(socket.SHUT_RDWR)
+                        break
+            finally:
                 conn.close()
-                s.close()
-                return
-            if buff:
-                conn.send(buff)
-                print(buff, end='')
-            else:
-                break
-            if buff.strip() == "!quit":
-                print("\nShutdown command recognized")
-                conn.send("Shutdown")
-                conn.shutdown(socket.SHUT_RDWR)
-                break
-        print("\nClient %s:%s - disconnected" % addr_info)
-        conn.close()
-        s.close()
-    except socket.error, e:
+                print("\nClient %s:%s - disconnected" % addr_info)
+    except socket.error as e:
         print("Socket error: %s" % (e))
+    except KeyboardInterrupt as e:
+        print("Server interrupted")
+    finally:
+        print("Shutdown server")
+        s.close()
 
 
 def main():
