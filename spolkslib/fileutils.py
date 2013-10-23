@@ -9,7 +9,7 @@ BUFFER_SIZE = 1024
 
 
 def get_file_size(f):
-    '''Return file-like object file size'''
+    """Return file-like object file size"""
     f.seek(0, 2)
     size = f.tell()
     f.seek(0, 0)
@@ -17,7 +17,7 @@ def get_file_size(f):
 
 
 def transfer_file(sock, f, buf_size=BUFFER_SIZE):
-    '''Transfer file-like object (f) through socket (sock)'''
+    """Transfer file-like object (f) through socket (sock)"""
     total_bytes_sended = 0
     while True:
         buffer = f.read(buf_size)
@@ -31,8 +31,10 @@ def transfer_file(sock, f, buf_size=BUFFER_SIZE):
 
 
 def recv_file(sock, f, download_limit,  buf_size=BUFFER_SIZE):
-    '''Receive file from socket
-    Return count of bytes received'''
+    """
+    Receive file from socket
+    Return count of bytes received
+    """
     total_bytes_readed = 0
     while (True):
         need_download = (download_limit - total_bytes_readed)

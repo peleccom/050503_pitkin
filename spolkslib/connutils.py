@@ -3,9 +3,12 @@ from __future__ import print_function
 import socket
 import os
 
+
 def send_buffer(conn, buffer):
-    '''Send a buffer content through socket (conn)
-    return true if successfull'''
+    """
+    Send a buffer content through socket (conn)
+    return true if successfull
+    """
     try:
         need_send = len(buffer)
         bytes_sended = conn.send(buffer)
@@ -14,17 +17,19 @@ def send_buffer(conn, buffer):
             need_send = len(buffer)
             bytes_sended = conn.send(buffer)
         return True
-    except Exception, e :
+    except Exception as e:
         print("send_buffer error %s" % e)
         return False
 
 
 def recv_buffer(conn, buffer_size):
-    '''Recieve buffer from a network connection
-    buffer_size - buffer length
+    """
+    Recieve buffer from a network connection
+    buffer_sizse - buffer length
     conn - socket
     return buffer, buffer size can be less than buffer_size value\
-if can't receive more data'''
+    if can't receive more data
+    """
     buffer = ''
     readed = 0
     try:
@@ -36,6 +41,6 @@ if can't receive more data'''
                 break
             readed += len(chunk)
             buffer += chunk
-    except Exception,e :
+    except Exception as e:
         print("Recv_buffer error %s" % e)
     return buffer

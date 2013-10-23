@@ -12,62 +12,141 @@ if __name__ == '__main__':
         os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from spolkslib import server
 from spolkslib import fileutils
+from spolkslib import connutils
 
 BUFFER_LENGTH = 1024
 
 def handle_server_request(conn, addr, f):
-    '''Handle single request
+    """
+    Handle single request
     conn - socket connection
     addr - addr info
-    f - file object to serve'''
+    f - file object to serve
+    """
     print("Client %s:%s - connected" % addr)
-
-    #send file size first
-    file_size = fileutils.get_file_size(f)
-    packed_size = struct.pack("!Q", file_size)
-    sended = conn.send(packed_size)
-    while (sended < len(packed_size)):
-        packed_size = packed_size[bytes_send:]
-        sended = sock.send(packed_size)
-
-    #send file content
-    transfered = fileutils.transfer_file(conn, f)
-    print("bytes " + str(transfered))
-    if transfered != fileutils.get_file_size(f):
-        print("eerror")
-    f.seek(0)
-    conn.close()
+    try:
+        #send file size first
+        file_size = fileutils.get_file_size(f)
+        packed_size = struct.pack("!Q", file_size)
+        if not connutils.send_buffer(conn, packed_size):
+            return
+        #recv fileseek
+        packed_seek_value = connutils.recv_buffer(conn, 8)
+        if len(packed_seek_value) != 8:
+            return
+        seek_value = struct.unpack("!Q", packed_seek_value)
+        if not seek_value:
+            return
+        seek_value = seek_value[0]
+        if seek_value:
+            f.seek(seek_value, 0)
+            print("Seeking to %s" % seek_value)
+        #send file content
+        transfered = fileutils.transfer_file(conn, f)
+        print("Bytes send " + str(transfered))
+        filesize = fileutils.get_file_size(f)
+        if transfered != filesize - seek_value:
+            print("!! Not all data has been sent !!")
+    except socket.error as e:
+        print("handle_server_request error %s" % e)
+    finally:
+        f.seek(0)
+        conn.close()
+        print("Client %s:%s - disconnected" % addr)
 
 
 def serve_file(port, f):
-    '''Run server on port to serve file f
-    Raise exception if fails'''
+    """
+    Run server on port to serve file f
+    Raise exception if fails
+    """
+    print("Server ran...")
+    server_socket = None
     try:
         server_socket = server.create_local_server(port)
         while(True):
-            try:
-                (conn, addr_info) = server_socket.accept()
-            except KeyboardInterrupt, e:
-                print("Accept interrupted by user")
-                server_socket.close()
-                return
+            (conn, addr_info) = server_socket.accept()
             handle_server_request(conn, addr_info, f)
 
     except socket.error, e:
         print("Socket error: %s" % (e))
+    except Exception as e:
+        print("Server Exception %s" % e)
+    finally:
+        if server_socket:
+            server_socket.close()
+        print("Shutdown server")
 
 
-def get_file_from_server(host, port, f):
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect((host, port))
-    packed_size = client_socket.recv(8)
-    print("Receiving file...\nfilesize - %s bytes"
-        % struct.unpack("!Q", packed_size))
-    client_socket.close()
+def get_file_from_server(host, port, filename, flag_overwrite=False):
+    try:
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    except socket.error as e:
+        print("Error creating client socket")
+        return
+    try:
+        client_socket.connect((host, port))
+    except socket.error as e:
+        client_socket.close()
+        print("error connecting to server: %s" % e)
+        return
+    try:
+        #get file size
+        packed_size = connutils.recv_buffer(client_socket, 8)
+        if len(packed_size) != 8:
+            return
+        #unpack long long format
+        server_filesize = struct.unpack("!Q", packed_size)
+        if not server_filesize:
+            print("Error receiving filesize")
+            return
+        server_filesize = server_filesize[0]
+        print("Server file size %s" % server_filesize)
+        seek_value = 0
+        if not flag_overwrite:
+            if os.path.exists(filename):
+                f = open(filename, "ab")
+                real_filesize = fileutils.get_file_size(f)
+                if real_filesize == server_filesize:
+                    print('File already downloaded\n'
+                        'Use --overwrite flag to rewrite file')
+                    f.close()
+                    return
+                elif real_filesize < server_filesize:
+                    print(u"Appending file %s" % filename)
+                    f.seek(0, 2)
+                    seek_value = f.tell()
+                    print("Seek to %s" % seek_value)
+                else:
+                    print("Local file has size more than server file")
+                    f.close()
+                    return
+            else:
+                # download new file
+                f = open(filename, "wb")
+        else:
+            f = open(filename, "wb")
+
+        packed_seek = struct.pack("!Q", seek_value)
+        if not connutils.send_buffer(client_socket, packed_seek):
+            f.close()
+            return
+        
+        print("Receiving file...")
+        bytes_received = fileutils.recv_file(client_socket, f, server_filesize)
+        print("Bytes received %s" % bytes_received)
+        if (bytes_received + seek_value) != server_filesize:
+            print("!!Not all data received!!")
+        f.close()
+    except Exception as e:
+        print(e)
+    finally:
+        client_socket.close()
+
+
 
 
 def server_command(args):
-    print("Run server..")
     try:
         f = open(args.r, "rb")
     except IOError, e:
@@ -78,23 +157,19 @@ def server_command(args):
         serve_file(args.port, f)
     except Exception, e:
         print(e)
+        sys.exit(1)
+    except KeyboardInterrupt as e:
+        print("Server interruped by user")
+        sys.exit(1)
     finally:
         f.close()
 
 
 def client_command(args):
-    print("Run client..")
     try:
-        f = open(args.w, "wb")
-    except IOEror, e:
-        print("Can't open file")
-        sys.exit(1)
-    try:
-        get_file_from_server(args.host, args.port, f)
-    except Exception, e:
-        print(e)
-    finally:
-        f.close()
+        get_file_from_server(args.host, args.port, args.w, args.overwrite)
+    except KeyboardInterrupt as e:
+        print("Client interrupted")
 
 
 def main():
@@ -110,6 +185,8 @@ def main():
     parser_client.add_argument("port", type=int)
     parser_client.add_argument("-w", help="Filename to write",
         required=True, metavar="filename ")
+    parser_client.add_argument("-o","--overwrite", help="Rewrite file if exists",
+        action="store_true")
     parser_client.set_defaults(func=client_command)
     args = parser.parse_args()
     args.func(args)

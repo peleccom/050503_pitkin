@@ -5,9 +5,11 @@ import os
 
 
 def create_local_server(port, use_UDP=False, backlog=1):
-    '''Create TCP(UDP) server at specified port
+    """
+    Create TCP(UDP) server at specified port
     Raise ValueError at wrong port value
-    Can raise socket error'''
+    Can raise socket_error ValueError
+    """
     if not 0 <= port <= 65535:
         raise ValueError("port must be 0-65535")
     if not use_UDP:
