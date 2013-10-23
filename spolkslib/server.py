@@ -19,5 +19,6 @@ def create_local_server(port, use_UDP=False, backlog=1):
     s = socket.socket(socket.AF_INET, socket_type)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(('', port))
-    s.listen(backlog)
+    if not use_UDP:
+        s.listen(backlog)
     return s
