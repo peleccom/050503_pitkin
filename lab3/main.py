@@ -16,6 +16,7 @@ from spolkslib import connutils
 
 BUFFER_LENGTH = 1024
 
+
 def handle_server_request(conn, addr, f):
     """
     Handle single request
@@ -131,7 +132,7 @@ def get_file_from_server(host, port, filename, flag_overwrite=False):
         if not connutils.send_buffer(client_socket, packed_seek):
             f.close()
             return
-        
+
         print("Receiving file...")
         bytes_received = fileutils.recv_file(client_socket, f, server_filesize)
         print("Bytes received %s" % bytes_received)
@@ -144,7 +145,7 @@ def get_file_from_server(host, port, filename, flag_overwrite=False):
         client_socket.close()
 
 
-
+    #arg parsing
 
 def server_command(args):
     try:
@@ -185,8 +186,8 @@ def main():
     parser_client.add_argument("port", type=int)
     parser_client.add_argument("-w", help="Filename to write",
         required=True, metavar="filename ")
-    parser_client.add_argument("-o","--overwrite", help="Rewrite file if exists",
-        action="store_true")
+    parser_client.add_argument("-o", "--overwrite",
+        help="Rewrite file if exists", action="store_true")
     parser_client.set_defaults(func=client_command)
     args = parser.parse_args()
     args.func(args)
