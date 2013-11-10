@@ -13,7 +13,7 @@ def send_buffer(conn, buffer):
         need_send = len(buffer)
         bytes_sended = conn.send(buffer)
         while (bytes_sended < need_send):
-            buffer = buffer[bytes_send:]
+            buffer = buffer[bytes_sended:]
             need_send = len(buffer)
             bytes_sended = conn.send(buffer)
         return True
@@ -41,6 +41,6 @@ def recv_buffer(conn, buffer_size):
                 break
             readed += len(chunk)
             buffer += chunk
-    except Exception as e:
-        print("Recv_buffer error %s" % e)
+    except socket.error as e:
+        print("recv_buffer error %s" % e) 
     return buffer
