@@ -17,6 +17,7 @@ if __name__ == '__main__':
 from spolkslib import server
 from spolkslib import fileutils
 from spolkslib import connutils
+from spolkslib import client
 
 BUFFER_LENGTH = 1024
 URGENT_BYTE = '!'
@@ -150,30 +151,12 @@ def get_file_from_server(host, port, filename, flag_overwrite=False):
             return
         server_filesize = server_filesize[0]
         print("Server file size %s" % server_filesize)
-        seek_value = 0
-        if not flag_overwrite:
-            if os.path.exists(filename):
-                f = open(filename, "ab")
-                real_filesize = fileutils.get_file_size(f)
-                if real_filesize == server_filesize:
-                    print('File already downloaded\n'
-                        'Use --overwrite flag to rewrite file')
-                    f.close()
-                    return
-                elif real_filesize < server_filesize:
-                    print(u"Appending file %s" % filename)
-                    f.seek(0, 2)
-                    seek_value = f.tell()
-                    print("Seek to %s" % seek_value)
-                else:
-                    print("Local file has size more than server file")
-                    f.close()
-                    return
-            else:
-                # download new file
-                f = open(filename, "wb")
-        else:
-            f = open(filename, "wb")
+        try:
+            (f, seek_value) = client.create_client_file(filename,
+                            server_filesize, flag_overwrite)
+        except client.ClientError as e:
+            print("Create file error: %s" % e)
+            return
 
         packed_seek = struct.pack("!Q", seek_value)
         if not connutils.send_buffer(client_socket, packed_seek):
