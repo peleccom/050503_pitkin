@@ -7,6 +7,9 @@ import argparse
 import os
 import struct
 import time
+import signal
+import fcntl
+import errno
 # A liitle hack to load lib from top-level
 if __name__ == '__main__':
     sys.path.insert(0,
@@ -20,34 +23,39 @@ URGENT_BYTE = '!'
 
 urg_sended = 0
 total_bytes_received = 0
+_sock = None
+
 
 def send_progress_handler(sock, count):
     """Called after buffer send"""
+    #send urgent data after MB sended
+    if (count % (1024 * 1024)) != 0:
+        return
     try:
         sock.send(URGENT_BYTE, socket.MSG_OOB)
-        print(count," bytes transfered")
-        time.sleep(0.5)
-    except Esocket.error as e:
+        print(count, " bytes transfered")
+        time.sleep(0.1)
+    except socket.error as e:
         print("Send OOB data error %s" % e)
     global urg_sended
-    urg_sended +=1
+    urg_sended += 1
 
 
 def recv_progress_handler(sock, count):
     global total_bytes_received
     total_bytes_received = count
-    print("bytes received %s" % count)
 
 
-def urgent_data_handler(conn, urg_data, count):
+def urgent_data_handler(signum, frame):
     """Called after received urgent data"""
     try:
+        urg_data = _sock.recv(1, socket.MSG_OOB)
         if urg_data == URGENT_BYTE:
-            print("URG: Received {} bytes".format(count))
+            print("URG: Received {} bytes".format(total_bytes_received))
         else:
             print("Unknown urgent value 0X%X received" % (urg_data))
-    except Exception, e:
-        print(e)
+    except socket.error as e:
+        print("Receiving urgent data error %s" % e)
 
 
 def handle_server_request(conn, addr, f):
@@ -76,8 +84,8 @@ def handle_server_request(conn, addr, f):
             f.seek(seek_value, 0)
             print("Seeking to %s" % seek_value)
         #send file content
-        transfered = fileutils.transfer_file(conn, 
-                                f, progress_callback=send_progress_handler)
+        transfered = fileutils.transfer_file(conn,
+                    f, progress_callback=send_progress_handler)
         print("Bytes send " + str(transfered))
         filesize = fileutils.get_file_size(f)
         if transfered != filesize - seek_value:
@@ -115,6 +123,7 @@ def serve_file(port, f):
 
 
 def get_file_from_server(host, port, filename, flag_overwrite=False):
+    global _sock
     try:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     except socket.error as e:
@@ -126,6 +135,9 @@ def get_file_from_server(host, port, filename, flag_overwrite=False):
         client_socket.close()
         print("error connecting to server: %s" % e)
         return
+    _sock = client_socket
+    signal.signal(signal.SIGURG, urgent_data_handler)
+    fcntl.fcntl(client_socket.fileno(), fcntl.F_SETOWN, os.getpid())
     try:
         #get file size
         packed_size = connutils.recv_buffer(client_socket, 8)
@@ -170,7 +182,7 @@ def get_file_from_server(host, port, filename, flag_overwrite=False):
 
         print("Receiving file...")
         bytes_received = fileutils.recv_file(client_socket, f, server_filesize,
-                progress_callback = recv_progress_handler)
+                progress_callback=recv_progress_handler)
         print("Bytes received %s" % bytes_received)
         if (bytes_received + seek_value) != server_filesize:
             print("!!Not all data received!!")
@@ -178,6 +190,7 @@ def get_file_from_server(host, port, filename, flag_overwrite=False):
     except Exception as e:
         print(e)
     finally:
+        signal.signal(signal.SIGURG, signal.SIG_DFL)
         client_socket.close()
 
 

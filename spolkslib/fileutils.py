@@ -21,7 +21,7 @@ def get_file_size(f):
 def transfer_file(sock, f, buf_size=BUFFER_SIZE, progress_callback=None):
     """
     Transfer file-like object (f) through socket (sock)
-    progress_callback - callback function, called when a packet of 
+    progress_callback - callback function, called when a packet of
         data send.
         def progress_handler(sock, count)
     """
@@ -48,7 +48,7 @@ def recv_file(sock, f, download_limit,  buf_size=BUFFER_SIZE,
     f - file-like object
     download_limit - reeiving file size
     buf_size - receive buffer size
-    progress_callback - callback function, called when a packet of 
+    progress_callback - callback function, called when a packet of
         data received.
         def progress_handler(sock, count)
     Return a count of received bytes
@@ -56,7 +56,7 @@ def recv_file(sock, f, download_limit,  buf_size=BUFFER_SIZE,
     total_bytes_received = 0
     while (True):
         need_download = (download_limit - total_bytes_received)
-        buffer = connutils.recv_buffer(sock, min(need_download, buf_size)) 
+        buffer = connutils.recv_buffer(sock, min(need_download, buf_size))
         bytes_readed = len(buffer)
         if buffer:
             f.write(buffer)

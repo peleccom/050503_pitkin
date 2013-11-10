@@ -42,5 +42,5 @@ def recv_buffer(conn, buffer_size):
             readed += len(chunk)
             buffer += chunk
     except socket.error as e:
-        print("recv_buffer error %s" % e) 
+        print("recv_buffer error %s" % e)
     return buffer
