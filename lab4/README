@@ -15,6 +15,11 @@
 
 		./main.py server -r <filename> <port>
 
+		где filename - имя существующего файла для чтения
+
+
 	Подключаемся с помощью клиента:
 
 		./main.py client -w <filename> <ip> <port>
+
+		где filename - имя файла для записи
