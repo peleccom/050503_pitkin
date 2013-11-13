@@ -3,6 +3,7 @@ from __future__ import print_function
 import socket
 import os
 import trace
+import time
 
 
 def _universal_send_buffer(conn, buffer, udp_addr=None):
@@ -13,6 +14,7 @@ def _universal_send_buffer(conn, buffer, udp_addr=None):
             bytes_sended = conn.send(buffer)
         else:
             bytes_sended = conn.sendto(buffer, udp_addr)
+        time.sleep(0.001)
         while (bytes_sended < need_send):
             buffer = buffer[bytes_sended:]
             need_send = len(buffer)
@@ -38,6 +40,7 @@ def _universal_recv_buffer(conn, buffer_size, udp=None):
                 chunk = conn.recv(buffer_size - readed)
             else:
                 (chunk, addr) = conn.recvfrom(buffer_size - readed)
+            time.sleep(0.001)
             if not len(chunk):
                 break
             readed += len(chunk)

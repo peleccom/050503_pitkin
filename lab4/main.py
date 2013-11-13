@@ -34,8 +34,8 @@ def send_progress_handler(sock, count):
         return
     try:
         sock.send(URGENT_BYTE, socket.MSG_OOB)
+        time.sleep(0.05)
         print(count, " bytes transfered")
-        time.sleep(0.1)
     except socket.error as e:
         print("Send OOB data error %s" % e)
     global urg_sended
@@ -51,12 +51,13 @@ def urgent_data_handler(signum, frame):
     """Called after received urgent data"""
     try:
         urg_data = _sock.recv(1, socket.MSG_OOB)
+        time.sleep(0.001)
         if urg_data == URGENT_BYTE:
             print("URG: Received {} bytes".format(total_bytes_received))
         else:
             print("Unknown urgent value 0X%X received" % (urg_data))
     except socket.error as e:
-        print("Receiving urgent data error %s" % e)
+        print("Receiving urgent data error %s %s" % (e, e.errno))
 
 
 def handle_server_request(conn, addr, f):
