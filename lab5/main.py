@@ -21,6 +21,7 @@ from spolkslib import client
 
 BUFFER_LENGTH = 1024
 
+PROTOCOL_COMMAND_RECORD_SIZE = 12
 # 4 byte commands
 PROTOCOL_COMMAND_SEEK = 'SEEK'
 PROTOCOL_COMMAND_SIZE = 'SIZE'
@@ -30,11 +31,24 @@ _client_file = None
 
 
 def protocol_send_seek(sock, seek):
-    if not connutils.send_buffer(sock, PROTOCOL_COMMAND_SEEK):
-        raise client.UdpClientError("Can't send seek command")
+    """
+    Send seek command and seek value
+    Length of sended bufffer 12 bytes
+        (8(long long int ) + 4 (SEEK_COMMAND) bytes)
+    """
     packed_seek = struct.pack("!Q", seek)
-    if not connutils.send_buffer(sock, packed_seek):
+    buffer = PROTOCOL_COMMAND_SEEK + packed_seek
+    assert len(buffer), PROTOCOL_COMMAND_RECORD_SIZE
+    if not connutils.send_buffer(sock, buffer):
         raise client.UdpClientError("Can't send seek value")
+
+
+def protocol_send_size(sock):
+    """Send size command to server"""
+    buffer = PROTOCOL_COMMAND_SIZE + 8 * ' '
+    assert len(buffer), PROTOCOL_COMMAND_RECORD_SIZE
+    if not connutils.send_buffer(sock, buffer):
+        raise client.UDClientError("Can't send SIZE command")
 
 
 def recv_progress_handler(sock, count):
@@ -50,8 +64,9 @@ def handle_server_request(conn, f, file_size):
     f - file object to serve
     """
     try:
-        (command, addr) = connutils.recv_buffer_from(conn,
-                                len(PROTOCOL_COMMAND_SEEK))
+        (command_record, addr) = connutils.recv_buffer_from(conn,
+                            PROTOCOL_COMMAND_RECORD_SIZE)
+        command = command_record[:4]
         if command == PROTOCOL_COMMAND_SIZE:
             # send size to client
             packed_size = struct.pack("!Q", file_size)
@@ -60,7 +75,7 @@ def handle_server_request(conn, f, file_size):
             return
         elif command == PROTOCOL_COMMAND_SEEK:
             # seek in file and send content
-            (packed_seek_value, addr) = connutils.recv_buffer_from(conn, 8)
+            packed_seek_value = command_record[4:]
             if len(packed_seek_value) != 8:
                 return
             seek_value = struct.unpack("!Q", packed_seek_value)
@@ -119,8 +134,7 @@ def get_file_from_server(host, port, filename, flag_overwrite=False):
         return
     try:
         #get file size
-        if not connutils.send_buffer(client_socket, PROTOCOL_COMMAND_SIZE):
-            return
+        protocol_send_size(client_socket)
         packed_size = connutils.recv_buffer(client_socket, 8)
         if len(packed_size) != 8:
             return
