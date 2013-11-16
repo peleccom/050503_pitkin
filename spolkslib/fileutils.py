@@ -90,8 +90,9 @@ def recv_file_udp(sock, f, download_limit, myDatagram, buf_size=BUFFER_SIZE,
     while (True):
         need_download = (download_limit - total_bytes_received)
         recv_data_size = min(need_download, buf_size)
-        buffer = myDatagram.send_request_blocking(sock, protocol.PROTOCOL_COMMAND_SEEK,
-                    f.tell(), recv_data_size = recv_data_size)
+        buffer = myDatagram.send_request_blocking(sock,
+                protocol.PROTOCOL_COMMAND_SEEK, f.tell(),
+                recv_data_size=recv_data_size)
 
         # file content in buffer
 

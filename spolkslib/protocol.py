@@ -10,22 +10,26 @@ import struct
 import signal
 import pdb
 
-
-PROTOCOL_COMMAND_SEEK = 'SEEK' # request chunk at
-PROTOCOL_COMMAND_DATA = 'DATA' # response with chunk
-PROTOCOL_COMMAND_SIZE = 'SIZE' # request file size
-PROTOCOL_COMMAND_FILE = 'FILE' # response with file size
+PROTOCOL_COMMAND_SEEK = 'SEEK'  # request chunk at
+PROTOCOL_COMMAND_DATA = 'DATA'  # response with chunk
+PROTOCOL_COMMAND_SIZE = 'SIZE'  # request file size
+PROTOCOL_COMMAND_FILE = 'FILE'  # response with file size
 
 BUFFER_SIZE = 1024
 #
+
+
 class ProtocolError(Exception):
     pass
-#
+
+
 class CommandProtocolException(Exception):
     pass
 
+
 class TimeoutException(Exception):
     pass
+
 
 class AlarmTimer(object):
 
@@ -45,8 +49,9 @@ class AlarmTimer(object):
         print("Alarm")
         raise TimeoutException("Timeout")
 
+
 class MyDatagram(object):
-    def __init__(self, server=False, repeat_count = 3, timeout= 5):
+    def __init__(self, server=False, repeat_count=3, timeout=5):
         """
         Create new client object
         if server = True - create server object
@@ -59,7 +64,7 @@ class MyDatagram(object):
     def get_datagram_number(self):
         return self._datagram_number
 
-    def pack(self, data, datagram_number = None):
+    def pack(self, data, datagram_number=None):
         if datagram_number == None:
             if self._server:
                 datagram_number = self._datagram_number
@@ -71,7 +76,7 @@ class MyDatagram(object):
 
     def unpack(self, datagram):
         size = len(datagram)
-        if size <=4:
+        if size <= 4:
             raise ProtocolError("Invalid size")
         actual_size = size - 4
         number_field = struct.unpack("!I", datagram[-4:])
@@ -128,7 +133,8 @@ class MyDatagram(object):
                 #receive timeout
                     while True:
                         buffer = connutils.recv_buffer(sock, recv_buffer_size)
-                        if not buffer: return buffer
+                        if not buffer:
+                            return buffer
                         try:
                             datagram_dict = self.unpack(buffer)
                             is_received = True
@@ -136,11 +142,13 @@ class MyDatagram(object):
                         except ProtocolError as e:
                             print("Bad datagram received %s" % e)
                     #pdb.set_trace()
-                    if is_received: break
+                    if is_received:
+                        break
             except TimeoutException:
                 print("Receive timeout")
                 continue
-        if not is_received: raise TimeoutException("Command send timeout")
+        if not is_received:
+            raise TimeoutException("Command send timeout")
         command = datagram_dict['data']
         # extract and return result
         if command_type == PROTOCOL_COMMAND_SIZE:
@@ -156,8 +164,7 @@ class MyCommandProtocol(object):
     SIZE_COMMAND_FILE = 4 + 8
     SIZE_COMMAND_SEEK = 4 + 8
     SIZE_COMMAND_DATA = 4
-    SIZE_COMMAND_SIZE = 4 + 8 # must be equal to size of SEEK_COMMAND
-
+    SIZE_COMMAND_SIZE = 4 + 8  # must be equal to size of SEEK_COMMAND
 
     @staticmethod
     def size_request():
@@ -197,7 +204,7 @@ class MyCommandProtocol(object):
         command = MyCommandProtocol.recognize_command(buffer)
         if command != PROTOCOL_COMMAND_SEEK:
             raise CommandProtocolException('Not SEEK command')
-        seek_value =  struct.unpack("!Q", buffer[4:])
+        seek_value = struct.unpack("!Q", buffer[4:])
         if seek_value:
             return int(seek_value[0])
         raise CommandProtocolException('Invalid SEEK value')
@@ -207,7 +214,7 @@ class MyCommandProtocol(object):
         command = MyCommandProtocol.recognize_command(buffer)
         if command != PROTOCOL_COMMAND_FILE:
             raise CommandProtocolException('Not FILE command')
-        size_value =  struct.unpack("!Q", buffer[4:])
+        size_value = struct.unpack("!Q", buffer[4:])
         if size_value and size_value[0]:
             return size_value[0]
         raise CommandProtocolException('Invalid SIZE value')

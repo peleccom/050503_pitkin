@@ -6,6 +6,9 @@ import trace
 import time
 
 
+URGENT_BYTE = "!"
+
+
 def _universal_send_buffer(conn, buffer, udp_addr=None):
     """Use send_buffer and send_buffer_to instead"""
     try:
