@@ -68,7 +68,7 @@ def recv_file(sock, f, download_limit, buf_size=BUFFER_SIZE,
                 and hasattr(progress_callback, "__call__")):
                 progress_callback(sock, total_bytes_received)
         if ((total_bytes_received == download_limit) or
-            (bytes_readed < BUFFER_SIZE)):
+            (bytes_readed < buf_size)):
             break
     return total_bytes_received
 
@@ -94,15 +94,18 @@ def recv_file_udp(sock, f, download_limit, myDatagram, buf_size=BUFFER_SIZE,
                     f.tell(), recv_data_size = recv_data_size)
 
         # file content in buffer
-        bytes_readed = len(buffer)
+
         if buffer:
+            bytes_readed = len(buffer)
             f.write(buffer)
             total_bytes_received += bytes_readed
             #Run callback
             if (progress_callback
                 and hasattr(progress_callback, "__call__")):
                 progress_callback(sock, total_bytes_received)
+        else:
+            bytes_readed = 0
         if ((total_bytes_received == download_limit) or
-            (bytes_readed < BUFFER_SIZE)):
+            (bytes_readed < buf_size)):
             break
     return total_bytes_received

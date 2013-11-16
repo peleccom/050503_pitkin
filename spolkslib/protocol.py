@@ -7,13 +7,15 @@ import connutils
 import fileutils
 import client
 import struct
-
+import signal
+import pdb
 
 
 PROTOCOL_COMMAND_SEEK = 'SEEK' # request chunk at
 PROTOCOL_COMMAND_DATA = 'DATA' # response with chunk
 PROTOCOL_COMMAND_SIZE = 'SIZE' # request file size
 PROTOCOL_COMMAND_FILE = 'FILE' # response with file size
+
 BUFFER_SIZE = 1024
 #
 class ProtocolError(Exception):
@@ -22,14 +24,37 @@ class ProtocolError(Exception):
 class CommandProtocolException(Exception):
     pass
 
+class TimeoutException(Exception):
+    pass
+
+class AlarmTimer(object):
+
+    def __init__(self, timeout):
+        self._timeout = timeout
+
+    def __enter__(self):
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, self._alarm_signal)
+        signal.alarm(self._timeout)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, signal.SIG_DFL)
+
+    def _alarm_signal(self, signum, frame):
+        print("Alarm")
+        raise TimeoutException("Timeout")
+
 class MyDatagram(object):
-    def __init__(self, server=False):
+    def __init__(self, server=False, repeat_count = 3, timeout= 5):
         """
         Create new client object
         if server = True - create server object
         """
         self._datagram_number = 0
         self._server = server
+        self._repeat_count = repeat_count
+        self._timeout = timeout
 
     def get_datagram_number(self):
         return self._datagram_number
@@ -52,6 +77,10 @@ class MyDatagram(object):
         number_field = struct.unpack("!I", datagram[-4:])
         if not number_field:
             raise ProtocolError("Invalid datagarm number")
+        if not self._server:
+            # check number
+            if number_field[0] != self.get_datagram_number():
+                raise ProtocolError("Incorrect answer sequence number")
         if self._server:
             self._datagram_number = number_field[0]
         buffer = datagram[:-4]
@@ -84,10 +113,34 @@ class MyDatagram(object):
                         MyCommandProtocol.SIZE_COMMAND_DATA + recv_data_size)
         else:
             raise CommandProtocolException("Invalid command")
-        buffer = self.pack(command)
-        connutils.send_buffer(sock, buffer)
-        buffer = connutils.recv_buffer(sock, recv_buffer_size)
-        datagram_dict = self.unpack(buffer)
+        is_received = False
+        for i in range(self._repeat_count):
+            # if send timeout go to next iteration
+            try:
+                with AlarmTimer(self._timeout):
+                    buffer = self.pack(command)
+                    connutils.send_buffer(sock, buffer)
+            except TimeoutException:
+                print("send timeout")
+                continue
+            try:
+                with AlarmTimer(self._timeout):
+                #receive timeout
+                    while True:
+                        buffer = connutils.recv_buffer(sock, recv_buffer_size)
+                        if not buffer: return buffer
+                        try:
+                            datagram_dict = self.unpack(buffer)
+                            is_received = True
+                            break
+                        except ProtocolError as e:
+                            print("Bad datagram received %s" % e)
+                    #pdb.set_trace()
+                    if is_received: break
+            except TimeoutException:
+                print("Receive timeout")
+                continue
+        if not is_received: raise TimeoutException("Command send timeout")
         command = datagram_dict['data']
         # extract and return result
         if command_type == PROTOCOL_COMMAND_SIZE:

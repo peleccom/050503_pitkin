@@ -165,14 +165,14 @@ def get_file_from_server(host, port, filename, flag_overwrite=False):
             return
 
         print("Receiving file...")
-        bytes_received = fileutils.recv_file(client_socket, f, server_filesize,
-                progress_callback=recv_progress_handler)
+        bytes_received = fileutils.recv_file(client_socket, f,
+            server_filesize-seek_value, progress_callback=recv_progress_handler)
         print("Bytes received %s" % bytes_received)
         if (bytes_received + seek_value) != server_filesize:
             print("!!Not all data received!!")
         f.close()
     except Exception as e:
-        print(e)
+        print("Client Disconnected: %s" % e)
     finally:
         signal.signal(signal.SIGURG, signal.SIG_DFL)
         client_socket.close()

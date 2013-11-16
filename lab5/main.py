@@ -57,6 +57,7 @@ def handle_server_request(conn, f, file_size, myDatagram):
         command_type = MyCommandProtocol.recognize_command(command)
         if command_type == protocol.PROTOCOL_COMMAND_SIZE:
             # send size to client
+            print("Size response for address %s" % (addr,))
             command = MyCommandProtocol.size_response(file_size)
             buffer = myDatagram.pack(command)
             connutils.send_buffer_to(conn, buffer, addr)
@@ -107,7 +108,6 @@ def serve_file(port, f):
 
 
 def get_file_from_server(host, port, filename, flag_overwrite=False):
-    global _server_file_size, _client_file
     try:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     except socket.error as e:
@@ -124,6 +124,7 @@ def get_file_from_server(host, port, filename, flag_overwrite=False):
         myDatagram = protocol.MyDatagram()
         server_filesize = myDatagram.send_request_blocking(client_socket,
                 protocol.PROTOCOL_COMMAND_SIZE)
+        if not server_filesize: return
         print("Server file size %s" % server_filesize)
         try:
             (f, seek_value) = client.create_client_file(filename,
@@ -131,11 +132,9 @@ def get_file_from_server(host, port, filename, flag_overwrite=False):
         except client.ClientError as e:
             print("Create file error %s" % e)
             return
-        _server_file_size = server_filesize
-        _client_file = f
         try:
             bytes_received = fileutils.recv_file_udp(client_socket, f,
-                    server_filesize, myDatagram, progress_callback=recv_progress_handler)
+                    server_filesize - seek_value, myDatagram, progress_callback=recv_progress_handler)
         finally:
             f.close()
         print("Bytes received %s" % bytes_received)
@@ -144,7 +143,7 @@ def get_file_from_server(host, port, filename, flag_overwrite=False):
     except client.UdpClientError as e:
         print("Udp client error: %s" % e)
     except Exception as e:
-        print(e)
+        print("Client Disconnected: %s" % e)
     finally:
         client_socket.close()
 
