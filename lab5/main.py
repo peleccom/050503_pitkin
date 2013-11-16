@@ -10,6 +10,9 @@ import time
 import signal
 import fcntl
 import errno
+import traceback
+import pdb
+
 # A liitle hack to load lib from top-level
 if __name__ == '__main__':
     sys.path.insert(0,
@@ -18,6 +21,8 @@ from spolkslib import server
 from spolkslib import fileutils
 from spolkslib import connutils
 from spolkslib import client
+from spolkslib import protocol
+from spolkslib.protocol import MyDatagram, MyCommandProtocol
 
 BUFFER_LENGTH = 1024
 
@@ -30,65 +35,45 @@ _server_file_size = None
 _client_file = None
 
 
-def protocol_send_seek(sock, seek):
-    """
-    Send seek command and seek value
-    Length of sended bufffer 12 bytes
-        (8(long long int ) + 4 (SEEK_COMMAND) bytes)
-    """
-    packed_seek = struct.pack("!Q", seek)
-    buffer = PROTOCOL_COMMAND_SEEK + packed_seek
-    assert len(buffer), PROTOCOL_COMMAND_RECORD_SIZE
-    if not connutils.send_buffer(sock, buffer):
-        raise client.UdpClientError("Can't send seek value")
-
-
-def protocol_send_size(sock):
-    """Send size command to server"""
-    buffer = PROTOCOL_COMMAND_SIZE + 8 * ' '
-    assert len(buffer), PROTOCOL_COMMAND_RECORD_SIZE
-    if not connutils.send_buffer(sock, buffer):
-        raise client.UDClientError("Can't send SIZE command")
-
-
 def recv_progress_handler(sock, count):
-    if _server_file_size > _client_file.tell():
-        #send seek request
-        protocol_send_seek(sock, _client_file.tell())
+    #if _server_file_size > _client_file.tell():
+    #    #send seek request
+    #    protocol_send_seek(sock, _client_file.tell())
+    print("received %s bytes" % count)
 
 
-def handle_server_request(conn, f, file_size):
+def handle_server_request(conn, f, file_size, myDatagram):
     """
     Handle single request
     conn - socket connection
     f - file object to serve
     """
     try:
-        (command_record, addr) = connutils.recv_buffer_from(conn,
-                            PROTOCOL_COMMAND_RECORD_SIZE)
-        command = command_record[:4]
-        if command == PROTOCOL_COMMAND_SIZE:
+        (buffer, addr) = connutils.recv_buffer_from(conn,
+                myDatagram.calculate_datagram_size(
+                    MyCommandProtocol.SIZE_COMMAND_SIZE))
+        datagram_dict = myDatagram.unpack(buffer)
+        command  = datagram_dict['data']
+        command_type = MyCommandProtocol.recognize_command(command)
+        if command_type == protocol.PROTOCOL_COMMAND_SIZE:
             # send size to client
-            packed_size = struct.pack("!Q", file_size)
-            if not connutils.send_buffer_to(conn, packed_size, addr):
-                return
+            command = MyCommandProtocol.size_response(file_size)
+            buffer = myDatagram.pack(command)
+            connutils.send_buffer_to(conn, buffer, addr)
+
             return
-        elif command == PROTOCOL_COMMAND_SEEK:
+        elif command_type == protocol.PROTOCOL_COMMAND_SEEK:
             # seek in file and send content
-            packed_seek_value = command_record[4:]
-            if len(packed_seek_value) != 8:
-                return
-            seek_value = struct.unpack("!Q", packed_seek_value)
-            if not seek_value:
-                return
-            seek_value = seek_value[0]
+            seek_value = MyCommandProtocol.unpack_seek_command(command)
             if not (seek_value is None):
                 print("Seeking to %s for address %s" % (seek_value, addr))
                 f.seek(seek_value, 0)
-            buffer = f.read(BUFFER_LENGTH)
+            buffer = f.read(protocol.BUFFER_SIZE)
             need_send = len(buffer)
             if not need_send:
                 return
+            command = MyCommandProtocol.data_response(buffer)
+            buffer = myDatagram.pack(command)
             connutils.send_buffer_to(conn, buffer, addr)
             #send file content
             return
@@ -106,13 +91,15 @@ def serve_file(port, f):
     try:
         server_socket = server.create_local_server(port, True)
         file_size = fileutils.get_file_size(f)
+        myDatagram = MyDatagram(server=True)
         while(True):
-            handle_server_request(server_socket, f, file_size)
+            handle_server_request(server_socket, f, file_size,myDatagram)
 
     except socket.error, e:
         print("Socket error: %s" % (e))
     except Exception as e:
         print("Server Exception %s" % e)
+        traceback.print_exc()
     finally:
         if server_socket:
             server_socket.close()
@@ -134,16 +121,9 @@ def get_file_from_server(host, port, filename, flag_overwrite=False):
         return
     try:
         #get file size
-        protocol_send_size(client_socket)
-        packed_size = connutils.recv_buffer(client_socket, 8)
-        if len(packed_size) != 8:
-            return
-        #unpack long long format
-        server_filesize = struct.unpack("!Q", packed_size)
-        if not server_filesize:
-            print("Error receiving filesize")
-            return
-        server_filesize = server_filesize[0]
+        myDatagram = protocol.MyDatagram()
+        server_filesize = myDatagram.send_request_blocking(client_socket,
+                protocol.PROTOCOL_COMMAND_SIZE)
         print("Server file size %s" % server_filesize)
         try:
             (f, seek_value) = client.create_client_file(filename,
@@ -153,10 +133,9 @@ def get_file_from_server(host, port, filename, flag_overwrite=False):
             return
         _server_file_size = server_filesize
         _client_file = f
-        protocol_send_seek(client_socket, seek_value)
         try:
-            bytes_received = fileutils.recv_file(client_socket, f,
-                    server_filesize, progress_callback=recv_progress_handler)
+            bytes_received = fileutils.recv_file_udp(client_socket, f,
+                    server_filesize, myDatagram, progress_callback=recv_progress_handler)
         finally:
             f.close()
         print("Bytes received %s" % bytes_received)
