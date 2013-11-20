@@ -11,41 +11,44 @@ if __name__ == '__main__':
         os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from lab5 import client_udp
-import server_udp
+from lab5 import server_udp
 from lab4 import client_tcp
 import server_tcp
 
 
 def server_command(args):
-    try:
-        f = open(args.r, "rb")
-    except IOError, e:
-        # exit
-        print("Can't open file")
+    if not os.path.isfile(args.r):
+        print("File %s doesn't exists" % args.r)
         sys.exit(1)
     try:
         if args.udp:
+            try:
+                f = open(args.r, "rb")
+            except IOError, e:
+                # exit
+                print("Can't open file")
+                sys.exit(1)
+            finally:
+                f.close()
             server_udp.serve_file(args.port, f)
         else:
-            server_tcp.serve_file(args.port, f)
+            server_tcp.serve_file(args.port, args.r)
     except Exception, e:
         print(e)
         sys.exit(1)
     except KeyboardInterrupt as e:
         print("Server interruped by user")
         sys.exit(1)
-    finally:
-        f.close()
 
 
 def client_command(args):
     try:
-        if not args.udp:
-            client_tcp.get_file_from_server(args.host,
-                args.port, args.w, args.overwrite)
+        if args.udp:
+            client_udp.get_file_from_server(args.host, args.port,
+                args.w, args.overwrite)
         else:
-            client_udp.get_file_from_server(args.host,
-                args.port, args.w, args.overwrite)
+            client_tcp.get_file_from_server(args.host, args.port,
+                args.w, args.overwrite)
     except KeyboardInterrupt as e:
         print("Client interrupted")
 
