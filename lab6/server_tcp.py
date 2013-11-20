@@ -30,7 +30,6 @@ def send_progress_handler(sock, count):
     try:
         sock.send(URGENT_BYTE, socket.MSG_OOB)
         time.sleep(0.05)
-        print(count, " bytes transfered")
     except socket.error as e:
         print("Send OOB data error %s" % e)
     global urg_sended
@@ -42,9 +41,12 @@ def handle_server_request(server_socket, f):
     f - file object to serve
     """
     client_sockets = []
-    addr_infos = {}
-    client_seeks = {}
-    can_write = []
+    #client_info = {
+    #"soket" :
+    #{"addr":"addr",
+    #"seek": 0, "can_write": False, "size_sended": False,"sended":0}
+    #}
+    client_info = {}
     file_size = fileutils.get_file_size(f)
     packed_size = struct.pack("!Q", file_size)
     buf_size = 1024
@@ -54,15 +56,26 @@ def handle_server_request(server_socket, f):
                 client_sockets, client_sockets)
             for r_socket in rfd:
                 if server_socket == r_socket:
+                    #new connection arrived
                     (conn, addr_info) = server_socket.accept()
                     print("Client %s:%s - connected" % addr_info)
+                    client_info[conn] = {
+                        "addr": addr_info,
+                        "seek": 0,
+                        "size_sended": False,
+                        "seek_received": False,
+                        "sended": 0,
+                    }
                     client_sockets.append(conn)
-                    addr_infos[conn] = addr_info
-                    #send file size first
-                    if not connutils.send_buffer(conn, packed_size):
-                        return
                 else:
-                    print("Read request from %s:%s" % addr_infos[r_socket])
+                    #client socket read
+                    if not client_info[r_socket]["size_sended"]:
+                        continue
+                    if client_info[r_socket]["seek_received"]:
+                        continue
+                    client_info_record = client_info[r_socket]
+                    print("Read request from %s:%s" %
+                            client_info_record["addr"])
                     #recv fileseek
                     packed_seek_value = connutils.recv_buffer(r_socket, 8)
                     if len(packed_seek_value) != 8:
@@ -75,43 +88,51 @@ def handle_server_request(server_socket, f):
                         client_sockets.remove(r_socket)
                         continue
                     seek_value = seek_value[0]
-                    f.seek(seek_value, 0)
-                    print("Seeking to %s" % seek_value)
-                    buffer = f.read(buf_size)
-                    client_seeks[r_socket] = f.tell()
-                    print("save")
-                    need_send = len(buffer)
-                    if not need_send:
-                        r_socket.close()
-                        client_sockets.remove(r_socket)
-                        continue
-                    if not connutils.send_buffer(r_socket, buffer):
-                        r_socket.close()
-                        client_sockets.remove(r_socket)
-                        continue
-                    can_write.append(r_socket)
+                    client_info_record["seek"] = seek_value
+                    client_info_record["seek_received"] = True
             for w_socket in wfd:
-                if  w_socket not in can_write:
+                if not client_info[w_socket]["size_sended"]:
+                    if connutils.send_buffer(w_socket, packed_size):
+                        client_info[w_socket]["size_sended"] = True
+                    else:
+                        print("error while send size to %s" %
+                            (client_info[w_socket]["addr"]))
+                        client_sockets.remove(wsocket)
+                        del client_info[wsocket]
+                        wsocket.close()
                     continue
-                print("Write to %s" % [addr_infos[w_socket]])
-                seek_value = client_seeks[w_socket]
+                if not client_info[w_socket]["seek_received"]:
+                    continue
+                #write chunk of data
+                client_info_record = client_info[w_socket]
+                seek_value = client_info_record["seek"]
                 f.seek(seek_value, 0)
-                print("Seeking to %s" % seek_value)
+                print("%s: seeking to %s" %
+                    (client_info_record["addr"], seek_value))
                 buffer = f.read(buf_size)
-                print("s")
-                client_seeks[w_socket] = f.tell()
+                client_info_record["seek"] = f.tell()
                 need_send = len(buffer)
                 if not need_send:
-                    w_socket.close()
                     client_sockets.remove(w_socket)
+                    del client_info[w_socket]
+                    w_socket.close()
+                    print("Client %s disconnected" %
+                        (client_info_record["addr"],))
                     continue
                 if not connutils.send_buffer(w_socket, buffer):
-                    w_socket.close()
+                    print("Error while send chunk to %s. disconnect" %
+                        (client_info_record["addr"],))
                     client_sockets.remove(w_socket)
+                    del client_info[w_socket]
+                    w_socket.close()
                     continue
+                client_info_record["sended"] += need_send
+                send_progress_handler(w_socket, client_info_record["sended"])
+
     finally:
         for client_socket in client_sockets:
-            print("Close socket connection %s" % [addr_infos[client_socket]])
+            print("Close socket connection %s" %
+                [client_info[client_socket]["addr"]])
 
 
 def serve_file(port, f):
