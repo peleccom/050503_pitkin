@@ -129,8 +129,8 @@ def serve_file(port, filename):
     except Exception as e:
         print("Server Exception %s" % e)
     finally:
-        print(childs)
         for pid in childs:
+            print("kill pid [%s]" % pid)
             os.kill(pid, signal.SIGKILL)
         if server_socket:
             server_socket.close()
