@@ -53,7 +53,7 @@ def handle_server_request(server_socket, f):
             [rfd, wfd, xfd] = select.select([server_socket] + client_sockets,
                 client_sockets, client_sockets)
             for r_socket in rfd:
-                if server_socket  == r_socket:
+                if server_socket == r_socket:
                     (conn, addr_info) = server_socket.accept()
                     print("Client %s:%s - connected" % addr_info)
                     client_sockets.append(conn)
@@ -112,6 +112,7 @@ def handle_server_request(server_socket, f):
     finally:
         for client_socket in client_sockets:
             print("Close socket connection %s" % [addr_infos[client_socket]])
+
 
 def serve_file(port, f):
     """

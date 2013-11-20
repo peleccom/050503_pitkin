@@ -22,6 +22,7 @@ from spolkslib.connutils import URGENT_BYTE
 
 urg_sended = 0
 
+
 class KilledThreadException(Exception):
     pass
 
@@ -52,8 +53,6 @@ class ServerThread(threading.Thread):
             print("%s: %s bytes transfered" % (self._addr_info, count))
         except socket.error as e:
             print("%s: Send OOB data error %s" % (self._addr, e))
-
-
 
     def handle_server_request(self, conn, addr, f):
         """
@@ -91,7 +90,7 @@ class ServerThread(threading.Thread):
         except socket.error as e:
             print("handle_server_request error %s" % e)
         except KilledThreadException as e:
-            print("Thread %s killed with message: %s" %(addr ,e))
+            print("Thread %s killed with message: %s" % (addr, e))
         finally:
             f.seek(0)
             f.close()
@@ -100,7 +99,7 @@ class ServerThread(threading.Thread):
             print("Client %s:%s - disconnected" % addr)
 
     def kill(self):
-        self._killed  = True
+        self._killed = True
 
 
 def serve_file(port, filename):

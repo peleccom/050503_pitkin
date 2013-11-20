@@ -22,13 +22,14 @@ from spolkslib.connutils import URGENT_BYTE
 urg_sended = 0
 childs = []
 
+
 def sigchld_signal(signum, frame):
     #No zombies today
     global childs
     (pid, status, _) = os.wait3(0)
     print("Child process  [%s] terminated with status %s" % (pid, status))
-
     childs.remove(pid)
+
 
 def send_progress_handler(sock, count):
     """Called after buffer send"""
@@ -43,7 +44,6 @@ def send_progress_handler(sock, count):
         print(count, " bytes transfered")
     except socket.error as e:
         print("Send OOB data error %s" % e)
-
 
 
 def handle_server_request(conn, addr, f):
