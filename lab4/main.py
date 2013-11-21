@@ -24,7 +24,7 @@ def server_command(args):
     try:
         server_tcp.serve_file(args.port, f)
     except Exception, e:
-        print(e)
+        print("Server exception %s" % e)
         sys.exit(1)
     except KeyboardInterrupt as e:
         print("Server interruped by user")

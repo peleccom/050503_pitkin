@@ -18,7 +18,7 @@ from spolkslib import fileutils
 from spolkslib import connutils
 from spolkslib import protocol
 from spolkslib.connutils import URGENT_BYTE
-
+from lab5 import server_udp
 urg_sended = 0
 childs = []
 
@@ -99,6 +99,22 @@ def serve_file(port, filename):
     global childs
     try:
         server_socket = server.create_local_server(port)
+        #fork udp server
+        try:
+            pid = os.fork()
+        except:
+            print("fork failed")
+            return 1
+        if pid == 0:
+            f = open(filename, "rb")
+            try:
+                server_udp.serve_file(port, f)
+            finally:
+                f.close()
+                os._exit(0)
+        else:
+            print("Created udp fork [%s]" % pid)
+            childs.append(pid)
         while(True):
             try:
                 (conn, addr_info) = server_socket.accept()
@@ -122,7 +138,6 @@ def serve_file(port, filename):
             else:
                 print("Created fork [%s]" % pid)
                 childs.append(pid)
-                print(childs)
                 conn.close()
     except socket.error, e:
         print("Socket error: %s" % (e))

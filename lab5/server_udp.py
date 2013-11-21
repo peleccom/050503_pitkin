@@ -72,7 +72,6 @@ def serve_file(port, f):
         myDatagram = MyDatagram(server=True)
         while(True):
             handle_server_request(server_socket, f, file_size, myDatagram)
-
     except socket.error, e:
         print("Socket error: %s" % (e))
     except Exception as e:

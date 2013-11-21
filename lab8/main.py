@@ -13,7 +13,7 @@ if __name__ == '__main__':
 from lab5 import client_udp
 from lab5 import server_udp
 from lab4 import client_tcp
-import server_tcp
+import server_common
 
 
 def server_command(args):
@@ -21,18 +21,7 @@ def server_command(args):
         print("File %s doesn't exists" % args.r)
         sys.exit(1)
     try:
-        if args.udp:
-            try:
-                f = open(args.r, "rb")
-            except IOError, e:
-                # exit
-                print("Can't open file")
-                sys.exit(1)
-            finally:
-                f.close()
-            server_udp.serve_file(args.port, f)
-        else:
-            server_tcp.serve_file(args.port, args.r)
+        server_common.serve_file(args.port, args.r)
     except Exception, e:
         print(e)
         sys.exit(1)
@@ -61,8 +50,6 @@ def main():
     parser_server.add_argument("port", type=int)
     parser_server.add_argument("-r", help="Filename to read from",
         required=True, metavar="filename")
-    parser_server.add_argument("-u", "--udp",
-        help="Use UDP connection", action="store_true")
     parser_server.set_defaults(func=server_command)
     parser_client.add_argument("host")
     parser_client.add_argument("port", type=int)
